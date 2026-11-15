@@ -1,65 +1,40 @@
-# Ponte DJEN — consulta privada via Vercel em São Paulo
+# Radar DJEN v2 — integração em preparação
 
-Projeto simples que permite consultar a **API pública do Diário de Justiça Eletrônico Nacional (DJEN)** por um painel privado. A requisição de saída é feita por uma Vercel Function configurada para a região **`gru1` (São Paulo, Brasil)**.
+Consulta manual da versão 1 preservada. Esta branch acrescenta integração opcional com Google Sheets, três rotas agendadas e um painel protegido.
 
-**Importante:** isto não garante acesso. O CNJ pode negar requisições de IPs de datacenter, mesmo no Brasil. O código não contorna autenticação, CAPTCHA, limites de acesso ou bloqueios adicionais: nesses casos, informa o erro.
+## Antes de publicar em produção
 
-## O que faz
+1. Ative a Google Sheets API num projeto Google Cloud da sua conta.
+2. Crie uma conta de serviço e descarregue a chave JSON de forma privada. **Nunca a inclua no repositório nem a envie por chat.**
+3. Copie o `client_email` da conta de serviço e partilhe **apenas** a planilha [Radar DJEN](https://docs.google.com/spreadsheets/d/11qWfllKLJt7RBKtAG-gqjPNIagdYwh8HxQN73xT58GQ/edit) com essa conta como Editor.
+4. Configure em Vercel → Settings → Environment Variables (Production):
+   - `PONTE_TOKEN`: manter o valor existente;
+   - `GOOGLE_SHEET_ID`: `11qWfllKLJt7RBKtAG-gqjPNIagdYwh8HxQN73xT58GQ`;
+   - `GOOGLE_SERVICE_ACCOUNT_JSON`: JSON da conta de serviço, mantido em segredo;
+   - `CRON_SECRET`: segredo distinto, com pelo menos 32 caracteres.
+5. Só depois dessas configurações, faça o merge para `main`. Confirme os logs do deploy e a consulta manual.
 
-- Busca nome de parte, nome de advogado, nome mencionado no texto ou número de processo.
-- Filtra por intervalo de datas e sigla do tribunal (ex.: `TJRO`, `TRT14`).
-- Devolve o total de resultados, dados de publicação, texto e eventual link oficial.
-- Exige chave secreta configurada como variável de ambiente `PONTE_TOKEN`.
-- Não armazena consultas em banco de dados nem registra o texto deliberadamente.
-- Limita consultas a intervalos de 31 dias, no máximo 50 resultados por página, e não faz consultas automáticas.
+## Rotinas
 
-## Como publicar na Vercel
+`vercel.json` define três horários UTC nos dias úteis:
+- `/api/cron12`: 12h UTC = 8h Rondônia
+- `/api/cron17`: 17h UTC = 13h Rondônia
+- `/api/cron22`: 22h UTC = 18h Rondônia
 
-1. Descompacte este ZIP no computador.
-2. Crie um repositório **privado** no GitHub e envie o conteúdo da pasta `ponte-djen-vercel` (ou use a CLI da Vercel se preferir).
-3. Abra https://vercel.com/new e importe o repositório.
-4. Escolha **Framework Preset: Other**, se solicitado, e a raiz que contém `vercel.json`.
-5. Nas configurações do projeto, adicione a variável de ambiente **`PONTE_TOKEN`**, com uma chave aleatória forte de **pelo menos 24 caracteres**. Sugestão: gere-a localmente com `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
-6. Faça o deploy e, em **Settings → Functions**, confirme a região **São Paulo (`gru1`)**. O arquivo `vercel.json` já solicita essa região.
-7. Abra a URL fornecida pela Vercel. Informe a chave e clique em **Consultar DJEN**.
+Os agendamentos enviam automaticamente `Authorization: Bearer CRON_SECRET`. O horário da Vercel Hobby pode ter variação. Cada execução lê a aba `Config`, consulta os tribunais na ordem e grava novas linhas em `Publicacoes` e `Execucoes`. O código nunca escreve em `Leitura_Claude` ou `Config`.
 
-Se alterar a variável de ambiente depois, execute um novo deploy para que a função use a alteração.
+## Histórico
 
-## Como verificar
+`POST /api/backfill` requer `x-ponte-token: PONTE_TOKEN`. **Cada chamada processa um tribunal num mês**, retomando do último lote terminado na aba `Execucoes`. Repita sequencialmente até `concluido: true`. Não faça backfill e cron em paralelo: Google Sheets não oferece travamento atômico por `id_djen`. As chamadas devem respeitar os limites de uso do CNJ.
 
-- Visite `https://SEU-SITE.vercel.app/api/saude`.
-- O resultado precisa mostrar `"regiao":"gru1"` e `"configurada":true`. **Isso só verifica a configuração**: não confirma acesso ao CNJ.
-- Faça uma consulta real pelo painel. Se aparecer HTTP 403, o CNJ não aceitou o IP de saída.
+## Painel
 
-## Observação sobre nomeações de peritos
+`/painel` exibe as publicações, filtros, status `Leitura_Claude` e últimas execuções; a API `/api/painel` requer `x-ponte-token`. O painel exige a chave antes de solicitar dados, mas a página HTML pública não contém informações restritas.
 
-O DJEN pode mencionar o perito no **inteiro teor da publicação**. Por isso o painel começa com o modo “Nome mencionado no texto”. Se não aparecer resultado, tente períodos mais curtos, `TJRO`, `TRT14` e número de processo. Uma ausência no DJEN **não** prova que não houve nomeação: consulte também os sistemas processuais pertinentes (PJe/eproc, conforme o tribunal).
+## Limitações
 
-## Política de uso
+Não há mecanismo de descoberta de decisões não publicadas. A API do DJEN só encontra publicações indexadas pelo CNJ. Bloqueios ou limites de acesso do CNJ são devolvidos como erros. Feriados exigem revisão da lógica de dias úteis. O monitoramento não substitui verificações processuais.
 
-Use apenas para consultas públicas e autorizadas, respeitando as regras, limites de taxa e disponibilidade do CNJ. O acesso não automatiza login nem publica informações protegidas. Não é canal oficial de intimação e **não substitui** o acompanhamento processual pelo profissional responsável.
+## Testes
 
-## Arquivos
-
-- `public/index.html`: painel web responsivo.
-- `api/consulta.js`: função de consulta, validação e autenticação.
-- `api/saude.js`: diagnóstico básico da configuração.
-- `vercel.json`: região São Paulo `gru1`.
-- `tests/consulta.test.js`: testes locais de validação e respostas simuladas da API.
-
-## Desenvolvimento e testes
-
-Requer Node.js 20 ou superior.
-
-```bash
-npm test
-```
-
-Os testes simulam respostas do CNJ e não verificam se o IP real de produção será aceito.
-
-Fontes técnicas:
-
-- Documentação da Vercel: https://vercel.com/docs/functions/configuring-functions/region
-- Regiões da Vercel: https://vercel.com/docs/regions
-- Portal do CNJ: https://www.cnj.jus.br/programas-e-acoes/processo-judicial-eletronico-pje/comunicacoes-processuais/
-- Documentação da API do DJEN: https://comunicaapi.pje.jus.br/swagger/index.html
+Execute `npm test`; é necessário completar validação da função real Vercel ↔ Google Sheets ↔ CNJ antes de ativar os agendamentos. Não há garantias de ausência de duplicidade sob concorrência; executar sequencialmente.

@@ -1,0 +1,3 @@
+import {authUser,json} from '../lib/auth.js';
+import {nextHistorical,runTribunal} from '../lib/radar.js';
+export default async function handler(req,res){if(req.method!=='POST')return json(res,405,{erro:'Use POST'});if(!authUser(req))return json(res,401,{erro:'Chave inválida'});try{const job=await nextHistorical();if(!job.next)return json(res,200,{concluido:true,progresso:job.total,total:job.total});const result=await runTribunal(job.next);return json(res,result.status==='ok'?200:502,{concluido:false,progresso:job.completed+(result.status==='ok'?1:0),total:job.total,resultado:result})}catch(e){return json(res,503,{erro:String(e.message||e)})}}
