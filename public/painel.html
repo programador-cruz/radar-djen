@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Painel | Radar DJEN</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,Segoe UI,sans-serif;background:#071326;color:#e8f1ff}
+*{box-sizing:border-box}body{margin:0}main{max-width:1250px;margin:auto;padding:24px}
+h1{margin:5px 0}h2{font-size:17px;margin:0 0 15px}p{color:#b9cbe7}
+a{color:#8dbdfa}.top{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap}
+.panel,.stat{background:#10223c;border:1px solid #29415e;border-radius:14px;padding:17px;margin:14px 0}
+.auth,.filters{display:flex;flex-wrap:wrap;gap:8px}input,select,button{padding:10px;background:#08172d;color:white;border:1px solid #426184;border-radius:9px;font:inherit}
+button{background:#155db2;cursor:pointer;font-weight:650}button:disabled{opacity:.5}
+input,select{min-width:150px;flex:1}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.stats .stat{margin:0}
+strong.value{font-size:27px;display:block;margin-top:5px}.muted{color:#aec2da;font-size:12px}
+section{margin-top:18px}.scroller{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:950px}
+td,th{font-size:13px;text-align:left;padding:12px 9px;border-bottom:1px solid #29415e;vertical-align:top}th{color:#abc3df}
+mark{background:#8c641a;color:white;padding:2px;border-radius:3px}.tag{border-radius:20px;background:#30445e;padding:5px 8px;display:inline-block}
+.bad{color:#ffadab}.good{color:#a7e8cb}.empty{padding:24px;text-align:center;color:#aec2da}
+@media(max-width:720px){main{padding:12px}.stats{grid-template-columns:repeat(2,1fr)}h1{font-size:23px}}
+</style></head><body><main>
+<div class="top"><div><small>RADAR DJEN · CENTRAL DE PERÍCIAS</small><h1>Monitoramento de publicações</h1><p>DJEN / CNJ · TJRO · TJAC · TRT14</p></div><a href="/">Consulta manual</a></div>
+<section class="panel auth"><input id="token" type="password" autocomplete="current-password" placeholder="Chave de acesso"><button id="load">Atualizar painel</button><button id="clear" type="button">Limpar chave</button></section><p id="error" class="bad"></p>
+<div class="stats"><div class="stat"><span class="muted">Novas hoje (UTC)</span><strong class="value" id="today">–</strong></div><div class="stat"><span class="muted">Últimos 7 dias</span><strong class="value" id="week">–</strong></div><div class="stat"><span class="muted">Total monitorado</span><strong class="value" id="total">–</strong></div><div class="stat"><span class="muted">Última execução</span><strong id="last">–</strong></div></div>
+<section class="panel"><h2>Publicações encontradas</h2><div class="filters"><input id="process" placeholder="Número do processo"><select id="tribunal"><option value="">Todos os tribunais</option></select><select id="tipo"><option value="">Todos os tipos</option></select><input id="from" type="date"><input id="to" type="date"></div><p class="muted" id="count"></p><div class="scroller"><table><thead><tr><th>Data</th><th>Tribunal e órgão</th><th>Processo</th><th>Tipo</th><th>Trecho</th><th>Status na Central</th><th>Link oficial</th></tr></thead><tbody id="rows"><tr><td colspan="7" class="empty">Carregue o painel para visualizar as publicações.</td></tr></tbody></table></div></section>
+<section class="panel"><h2>Saúde da ponte</h2><p class="muted">Últimas execuções por tribunal. Atrasos em feriados podem exigir confirmação.</p><div class="scroller"><table><thead><tr><th>Tribunal</th><th>Última execução</th><th>Status</th><th>Novas</th><th>Alerta</th></tr></thead><tbody id="logs"><tr><td colspan="5" class="empty">Sem dados.</td></tr></tbody></table></div></section>
+<p class="muted">Consulta informativa: o DJEN não inclui todos os atos internos. Confirme atos e prazos na fonte processual.</p>
+</main><script>
+const el=id=>document.getElementById(id),state={data:null};
+el('token').value=sessionStorage.getItem('radar_token')||'';
+const td=(tr,value)=>{const cell=document.createElement('td');cell.textContent=String(value??'');tr.append(cell);return cell;};
+const ro=iso=>{if(!iso)return '–';const d=new Date(iso);return Number.isNaN(d.getTime())?iso:new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Porto_Velho',dateStyle:'short',timeStyle:'short'}).format(d)};
+const opts=(id,values)=>{const s=el(id),old=s.value;s.replaceChildren(new Option(id==='tipo'?'Todos os tipos':'Todos os tribunais',''));for(const v of [...new Set(values)].filter(Boolean).sort())s.append(new Option(v,v));s.value=old;};
+function renderRows(){if(!state.data)return;const process=el('process').value.replace(/\D/g,''),tribunal=el('tribunal').value,tipo=el('tipo').value,from=el('from').value,to=el('to').value;
+const list=state.data.publicacoes.filter(p=>(!process||String(p.processo).replace(/\D/g,'').includes(process))&&(!tribunal||p.tribunal===tribunal)&&(!tipo||p.tipo===tipo)&&(!from||p.data>=from)&&(!to||p.data<=to));
+el('count').textContent=list.length+' publicação(ões).';el('rows').replaceChildren();
+if(!list.length){const tr=document.createElement('tr');td(tr,'Nenhuma publicação neste filtro.').colSpan=7;el('rows').append(tr);return;}
+for(const p of list){const tr=document.createElement('tr');td(tr,p.data);td(tr,[p.tribunal,p.orgao].filter(Boolean).join(' · '));td(tr,p.processo);td(tr,p.tipo);
+const excerpt=td(tr,p.trecho);if(/nomeio|nomead|perito/i.test(p.termos))excerpt.style.color='#ffd36e';const status=td(tr,p.central?(p.central.classificacao+' · '+p.central.acao):'Ainda não lido');status.className='muted';const link=td(tr,'');if(/^https:\/\//.test(p.link)){const a=document.createElement('a');a.textContent='Abrir no DJEN';a.href=p.link;a.rel='noopener noreferrer';a.target='_blank';link.append(a)}else link.textContent='Sem link';el('rows').append(tr)}}
+function renderLogs(){const logs=state.data.execucoes;el('logs').replaceChildren();const tribunais=[...new Set([...logs.map(l=>l.tribunal),...state.data.publicacoes.map(p=>p.tribunal)])].filter(Boolean);for(const tribunal of tribunais){const r=logs.find(x=>x.tribunal===tribunal),tr=document.createElement('tr');td(tr,tribunal);td(tr,r?ro(r.hora):'–');const status=td(tr,r?r.status:'Sem dados');status.className=r?.status==='ok'?'good':'bad';td(tr,r?.novas??'–');const age=r?Date.now()-Date.parse(r.hora):Infinity;td(tr,!r?'Sem execução':r.status==='erro'?'Erro na última execução':age>86400000?'Verificar atraso':'Sem alerta');el('logs').append(tr)}if(!tribunais.length){const tr=document.createElement('tr');td(tr,'Sem execuções ainda').colSpan=5;el('logs').append(tr)}}
+function render(){const s=state.data.resumo;el('today').textContent=s.hoje;el('week').textContent=s.semana;el('total').textContent=s.total;el('last').textContent=s.ultima?s.ultima.status+' · '+ro(s.ultima.hora):'Sem execuções';opts('tribunal',state.data.publicacoes.map(p=>p.tribunal));opts('tipo',state.data.publicacoes.map(p=>p.tipo));renderRows();renderLogs();}
+el('load').onclick=async()=>{const token=el('token').value;if(!token)return el('error').textContent='Informe a chave.';sessionStorage.setItem('radar_token',token);el('error').textContent='';el('load').disabled=true;try{const response=await fetch('/api/painel',{headers:{'x-ponte-token':token},cache:'no-store'}),data=await response.json();if(!response.ok)throw Error(data.erro||'Erro HTTP '+response.status);state.data=data;render()}catch(e){el('error').textContent=e.message}finally{el('load').disabled=false}};
+el('clear').onclick=()=>{sessionStorage.removeItem('radar_token');el('token').value=''};for(const id of ['process','tribunal','tipo','from','to'])el(id).addEventListener('input',renderRows);
+</script></body></html>

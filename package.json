@@ -1,9 +1,8 @@
 {
-  "name": "ponte-djen-vercel",
-  "version": "1.0.0",
+  "name": "radar-djen",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Painel privado de consulta à API pública DJEN/CNJ na região gru1 da Vercel",
   "scripts": {
     "test": "node --test tests/*.test.js"
   },

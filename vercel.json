@@ -1,13 +1,52 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "regions": ["gru1"],
+  "regions": [
+    "gru1"
+  ],
+  "rewrites": [
+    {
+      "source": "/painel",
+      "destination": "/painel.html"
+    }
+  ],
+  "functions": {
+    "api/cron*.js": {
+      "maxDuration": 300
+    },
+    "api/backfill.js": {
+      "maxDuration": 300
+    },
+    "api/painel.js": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron12",
+      "schedule": "0 12 * * 1-5"
+    },
+    {
+      "path": "/api/cron17",
+      "schedule": "0 17 * * 1-5"
+    },
+    {
+      "path": "/api/cron22",
+      "schedule": "0 22 * * 1-5"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" }
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        }
       ]
     }
   ]
